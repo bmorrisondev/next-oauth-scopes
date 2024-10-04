@@ -1,6 +1,62 @@
+'use client'
+import { SignedIn, UserButton, useUser } from "@clerk/nextjs";
 import Image from "next/image";
+import { getGoogleToken } from "./actions";
+import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
 
 export default function Home() {
+  const { user } = useUser()
+  const [isInit, setIsInit] = useState(false)
+
+  useEffect(() => {
+    async function reauthAcct() {
+      if(user) {
+        // Grab the Google Account from the user's list of external accounts
+        const googleAccount = user.externalAccounts
+          .find(ea => ea.provider === "google")
+
+        const reauth = await googleAccount?.reauthorize({
+          // This is just where you want the person to end up after the reauth
+          redirectUrl: window.location.href,
+          // Provide the additional scopes to reauthenticate the user
+          additionalScopes: [
+            "https://www.googleapis.com/auth/calendar.readonly",
+            'https://www.googleapis.com/auth/calendar.events.readonly'
+          ]
+        })
+
+        // From the reauthorization request, grab the URL to redirect the user to confirm permissions
+        if(reauth?.verification?.externalVerificationRedirectURL) {
+          const { href } =
+          window.location.href = reauth?.verification?.externalVerificationRedirectURL.href
+        }
+      }
+    }
+
+    // When we have a user and we've not already started the init process, check the scopes
+    if(user && !isInit) {
+      setIsInit(true)
+      const googleAccount = user.externalAccounts.find(ea => ea.provider === "google")
+      // If the account doesn't have the required scope, start the reauth process
+      if(!googleAccount?.approvedScopes?.includes("https://www.googleapis.com/auth/calendar.readonly")) {
+        reauthAcct()
+      }
+    }
+  }, [user])
+
+  async function getCalendarStuff() {
+    const tokenInfo = await getGoogleToken()
+    const { token } = tokenInfo
+    const res = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    })
+    const json = await res.json()
+    console.log(json)
+  }
+
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
@@ -12,6 +68,18 @@ export default function Home() {
           height={38}
           priority
         />
+        <SignedIn>
+          <UserButton userProfileProps={{
+            additionalOAuthScopes: {
+              google: [
+                'https://www.googleapis.com/auth/calendar.readonly'
+              ]
+            }
+          }} />
+          <Button onClick={getCalendarStuff} >
+            Get calendar data
+          </Button>
+        </SignedIn>
         <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
           <li className="mb-2">
             Get started by editing{" "}
