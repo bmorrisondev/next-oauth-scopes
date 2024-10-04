@@ -28,7 +28,6 @@ export default function Home() {
 
         // From the reauthorization request, grab the URL to redirect the user to confirm permissions
         if(reauth?.verification?.externalVerificationRedirectURL) {
-          const { href } =
           window.location.href = reauth?.verification?.externalVerificationRedirectURL.href
         }
       }
